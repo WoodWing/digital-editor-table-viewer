@@ -1,0 +1,12 @@
+/* Table viewer interactive component style */
+.table-viewer { 
+    padding: 0px;
+    iframe {
+        width: 100%;
+    }
+
+    .table {
+        table, th, td { border: 1px solid black }
+    }
+}
+

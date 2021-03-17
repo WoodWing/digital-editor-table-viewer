@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script type="application/javascript" src="int-comp-sdk-v1.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="xlsx.full.min.js"></script>    
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.5/build/pure-min.css" integrity="sha384-LTIDeidl25h2dPxrB2Ekgc9c7sEC3CWGM6HeFmuDNUjX76Ert4Z4IY714dhZHPLd" crossorigin="anonymous">
+
+    <style>
+        html,
+        body {
+            max-height: 500px;
+            margin: 0;
+        }
+
+        .wrapper {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 12px 0px;            
+            flex-shrink: 0;
+        }
+        .content {
+            flex: 1;
+            overflow: auto;
+            max-height: 450px;
+        }      
+        
+        th {            
+            background: #eee;
+            position: sticky;
+            top: 0;  
+            vertical-align: text-top;          
+        }
+    </style>
+
+    <script>        
+        const serverUrl = 'http://docker.for.mac.localhost/Studio/';  
+        const csUrl = 'http://docker.for.mac.localhost/Studio/app/';      
+        
+        // Called when google maps script has been loaded.
+         function _onLoad() {
+            // Log communication messages for develop purposes.
+            IntCompSdk.logMessages(true);
+
+            // Start listening to messages from ContentStation
+            IntCompSdk.listen(_onMessage);
+
+            // Notify ContentStation this page is ready to receive data
+            IntCompSdk.readyForData();
+
+            // Track window resize to keep the map center location in the middle
+            window.addEventListener('resize', _onResizeWindow);            
+        }
+
+        // Handle message sent from ContentStation
+        function _onMessage(message) {
+            if (message.id === 'useData') {
+                //renderTable (message.data.options.tableData);
+                $("#table-view").html (message.data.options.tableHTML);
+                IntCompSdk.fitHeight();    
+            }
+        }
+        
+        function _onResizeWindow() {
+            
+        }
+
+        /**
+        * Filter the HTML table
+        * @param {*} table Id of the HTML container 
+        * @param {*} value Value to filter on 
+        */
+       function filterTable(containerId, value) {    
+            value = value.toLowerCase();         
+            $(containerId + " tr").filter(function() { 
+                if ($(this).find('td').length) {
+                    $(this).toggle($(this).text() 
+                        .toLowerCase().indexOf(value) > -1) 
+                }            
+            });            
+        }        
+
+    </script>
+</head>
+
+<body onload="_onLoad()">
+    <div class="wrapper">
+        <div class="header">
+            <input type="text" id="filterInput" onkeyup="filterTable('#table-view', $('#filterInput').val())" placeholder="Filter...">
+        </div>
+        <div class="content">            
+            <div id="table-view"></div>
+        </div>            
+    </div>
+</body>
+
+</html>

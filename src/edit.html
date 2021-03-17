@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script type="application/javascript" src="int-comp-sdk-v1.js"></script>
+    <script type="application/javascript" src="table-editor.js"></script>
+    <script type="application/javascript" src="studio-services.js"></script>
+    <script lang="application/javascript" src="sheetjs/dist/xlsx.full.min.js"></script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    
+    <!--Style of the table-->
+    <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.5/build/pure-min.css" integrity="sha384-LTIDeidl25h2dPxrB2Ekgc9c7sEC3CWGM6HeFmuDNUjX76Ert4Z4IY714dhZHPLd" crossorigin="anonymous">
+
+    <!-- Default style of the UI-->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+    <!-- Additional UI styling-->
+    <link rel="stylesheet" href="edit.css">
+
+    <script>
+        const RELATIVE_SERVER_URL = '../server/index.php'; //TODO requires API
+        
+        let tableEditor = new TableEditor();
+        let studioServices = new StudioServices(getServerURL());
+
+        //View states
+        const VIEWSTATE_LOADING = "loading_state";
+        const VIEWSTATE_NO_SPREADSHEET_SELECTED = "no_spreadsheet_selected";
+        const VIEWSTATE_NO_SPREADSHEETS_IN_DOSSIER = "no_spreadsheet_in_dossier";
+        const VIEWSTATE_TABLE_EDITING = "table_editing";
+
+
+        // Called when table editor has been loaded has been loaded.
+        async function _onLoad() {
+            setViewState (VIEWSTATE_LOADING);                        
+
+            // Log communication messages for develop purposes.
+            IntCompSdk.logMessages(true);
+
+            // Start listening to messages from ContentStation
+            IntCompSdk.listen(_onMessage);
+
+            // Notify ContentStation this page is ready to receive data
+            IntCompSdk.readyForData();
+
+            //Load the list of spreadsheets
+            loadSpreadSheetsFromDossier();
+        }
+
+        function _onMessage(message) {
+            switch (message.id) {
+                case 'useData':
+                    if (message.data.options.workBook && message.data.options.workBook != null) {
+                        tableEditor.workBook = message.data.options.workBook;
+                        tableEditor.sheetName = message.data.options.sheetName;
+                        tableEditor.studioFileId = message.data.options.studioFileId;
+                        loadSheet ();
+                    }                
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // Called when button 'Cancel' is clicked. Does not update content,  but closes the edit dialog.
+        function dismiss() {
+            IntCompSdk.postMessage({
+                id: 'dismiss',
+                version: '1.0'
+            });
+        }
+
+        // Called when button 'Submit' is clicked. Submit the current map view and markers as new content of the component.
+        function submit() {
+            data = { 
+                "options": { 
+                    "workBook": tableEditor.workBook, 
+                    "sheetName": tableEditor.sheetName, 
+                    "studioFileId": tableEditor.studioFileId,
+                    "tableHTML": $("#table-view").html()
+                }
+            }
+
+            IntCompSdk.postMessage({
+                id: 'submit',
+                data: data,
+                version: '1.0'
+            });
+        }
+
+        /**
+         * Set the acivte WorkBook/SheetName and render the table
+         */ 
+        function loadSheet () {            
+            //Load the sheets select
+            $("#sheetNameSelect").empty();
+            tableEditor.workBook.SheetNames.forEach (sheetName =>
+                $("#sheetNameSelect").append(new Option(sheetName, sheetName))
+            );
+            $('#sheetNameSelect').val(tableEditor.sheetName);
+
+            //Load range input
+            $('#rangeInput').val(tableEditor.range);
+
+            //Render the table
+            tableEditor.renderTable ("#table-view"); 
+
+            //Cell hover functions
+            $( "td" ).hover(
+                function() {
+                    var coord = $(this).attr('id');
+                    $('#cellLabel').text('Cell ' + coord);
+                    
+                }, function() {
+                    $('#cellLabel').text('');
+                }
+            );   
+
+            //Show table
+            setViewState (VIEWSTATE_TABLE_EDITING);            
+        }
+
+        /**
+         * Load the available spreadsheets from the articles dossier
+         */ 
+        async function loadSpreadSheetsFromDossier () {
+            var articleId = getArticleId();
+            let dossierIds = await studioServices.getDossierIds(articleId);
+            let spreadSheets = await studioServices.getFilesFromDossiers(dossierIds, ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]);
+            
+            if (spreadSheets.length > 0) {
+                //File the list of spread sheets    
+                $('#spreadSheetSelect').empty();        
+                spreadSheets.forEach(spreadSheet => 
+                    $("#spreadSheetSelect").append(new Option(spreadSheet[1], spreadSheet[0]))
+                );
+                if (tableEditor.studioFileId) {
+                    $("#spreadSheetSelect").val (tableEditor.studioFileId);
+                }
+                
+                
+                //Enable the controls
+                $('#spreadSheetSelect').prop('disabled', false);
+                $('#spreadSheetLoadButton').prop('disabled', false);
+
+                if (!tableEditor.workBook) {
+                    setViewState (VIEWSTATE_NO_SPREADSHEET_SELECTED);                        
+                }                            
+            } else {
+                setViewState(VIEWSTATE_NO_SPREADSHEETS_IN_DOSSIER);
+            }
+
+            updateSpreadSheetLoadButton();
+        }
+
+        /**
+         * Get the ID of article
+         * TODO Requires API
+         */ 
+        function getArticleId () {
+            var url = "" + window.parent.parent.location;
+            return url.substr(url.lastIndexOf("/") + 1, url.indexOf("?") -  url.lastIndexOf("/") - 1);
+        }
+
+        /**
+         * Returns the server url
+         * TODO Requires API 
+         */ 
+         function getServerURL () {
+            var url = "" + window.parent.parent.location;
+            return url.substr(0, url.indexOf("#")) + RELATIVE_SERVER_URL;
+         }        
+
+        /**
+         * Load a spreadsheet from the Studio server
+         * @param spreadSheetId Studio object id
+         */ 
+        async function importSpreadSheet (spreadSheetId) {            
+            setViewState(VIEWSTATE_LOADING);
+            
+            let spreadSheet = await studioServices.getObjects ([spreadSheetId], "native");
+
+            if (spreadSheet.Files.length > 0) {
+                let url = spreadSheet.Files[0].FileUrl;
+                var req = new XMLHttpRequest();
+                req.open("GET", url, true);
+                req.responseType = "arraybuffer";
+                req.setRequestHeader ('X-WoodWing-Application', 'Content Station');
+
+                req.onload = function(e) {
+                    var data = new Uint8Array(req.response);            
+                
+                    tableEditor.workBook = XLSX.read(data, {type:"array"});
+                    tableEditor.sheetName = tableEditor.workBook.SheetNames[0];    
+                    tableEditor.studioFileId = spreadSheetId;  
+                                             
+                    loadSheet ();
+                    updateSpreadSheetLoadButton();
+                }
+
+                req.send();
+            }
+        }
+
+        /**
+         * Change handler of the sheet name selector
+         */ 
+        function sheetNameSelectOnChange (sheetName) {
+            tableEditor.sheetName = sheetName;
+            loadSheet ();
+        }
+
+        /**
+         * Change handler of the range input field
+         */
+        function rangeInputOnChage (range) {
+            tableEditor.range = range;
+            loadSheet ();
+        }
+
+        /**
+         * Change handler of the spreadsheet select 
+         */
+        function updateSpreadSheetLoadButton () {
+            if ($('#spreadSheetSelect').val() == tableEditor.studioFileId) {
+                $("#spreadSheetLoadButton").html("Update");
+            } else {
+                $("#spreadSheetLoadButton").html("Load");
+            }
+        }
+
+        /**
+         * Update the view
+         */ 
+        function setViewState (state) {
+            switch(state) {
+                case VIEWSTATE_LOADING:
+                    $('#table-view').hide();
+                    $('#message-view-text').html ("Loading, one moment...");                    
+                    $('#message-view').show();                    
+                    break;
+
+                case VIEWSTATE_NO_SPREADSHEETS_IN_DOSSIER:                    
+                    $('#table-view').hide();                    
+                    $('#spreadSheetSelect').empty();        
+                    $('#message-view-text').html ("Please add a spreadsheet to the Dossier first.");                                            
+                    $('#message-view').show();
+                    break;
+
+                case VIEWSTATE_NO_SPREADSHEET_SELECTED:
+                    $('#table-view').hide();
+                    $('#message-view-text').html ("Please select a spreadsheet in the side panel.");                                            
+                    $('#message-view').show();
+                    break;
+
+                case VIEWSTATE_TABLE_EDITING:
+                    $('#table-view').show();
+                    $('#message-view').hide();
+                    break;    
+            }
+        }
+    </script>
+</head>
+
+<body onload="_onLoad()">
+    <div class="wrapper">
+        <div class="content">
+            <div id="table-view" class="table-view" style="display: none">
+            </div>
+            
+            <div id="message-view" class="empty-view"> 
+                <span id="message-view-text"></span>
+            </div>
+
+            <div id="tableSettingsContainer" class="sidebar">
+                <div class="container">
+                    <div class="row">
+                        <div class="col">
+                            <h2>Spreadsheet</h2>
+                            <select id="spreadSheetSelect" class="custom-select" onchange="updateSpreadSheetLoadButton()" disabled>
+                                <option>Loading...</option> 
+                            </select>
+                            <button id="spreadSheetLoadButton" class="submit" onclick="importSpreadSheet($('#spreadSheetSelect :selected').val())" disabled>Load</button>
+                        </div>                        
+                    </div>
+
+
+                    <div class="row">
+                        <div class="col">
+                            <h2>Properties</h2>
+                        </div>                        
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <label>Worksheet</label>
+                            <select id="sheetNameSelect" class="custom-select" onchange="sheetNameSelectOnChange(this.options[this.selectedIndex].value);"></select>
+                        </div>
+                    </div> 
+
+                    <div class="row">
+                        <div class="col">
+                            <label>Range</label>
+                            <input type="text" id="rangeInput" class="form-control" onchange="rangeInputOnChage(this.value)"></input>                            
+                        </div>
+                    </div>                     
+                </div>                      
+            </div>
+        </div>
+
+        <footer class="footer">
+            <label id="cellLabel"></label>
+            <button class="right submit" onclick="submit()">OK</button>
+            <button class="right" onclick="dismiss()">Cancel</button>
+        </footer>
+    
+    </div>
+</body>
+
+</html>
