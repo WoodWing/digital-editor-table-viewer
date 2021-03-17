@@ -1,6 +1,9 @@
 # WoodWing Digital Editor - Table Viewer POC
 The table viewer is a POC to visualise excel tables in the digital editor. The excel files are loaded from the Dossier of the digital article. 
 
+
+![Table Editor in action](https://github.com/WoodWing/digital-editor-table-viewer/blob/master/Table-Editor-POC.gif "Table Editor in action")
+
 ## Feedback
 * Check out & in excel file
 * Create new excel file
