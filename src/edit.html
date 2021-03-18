@@ -129,7 +129,7 @@
         async function loadSpreadSheetsFromDossier () {
             var articleId = getArticleId();
             let dossierIds = await studioServices.getDossierIds(articleId);
-            let spreadSheets = await studioServices.getFilesFromDossiers(dossierIds, ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]);
+            let spreadSheets = await studioServices.getFilesFromDossiers(dossierIds, ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-excel"]);
             
             if (spreadSheets.length > 0) {
                 //File the list of spread sheets    
