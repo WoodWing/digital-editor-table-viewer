@@ -20,6 +20,7 @@ The table viewer is a POC to visualise excel tables in the digital editor. The e
 * Add the files from component-set to your component set
 * Add the following to your components-definition.json, update the view and edit urls, compile the component set and upload it into your server  
 
+```
 "components":[
         {
             "name": "table-viewer",
@@ -68,5 +69,5 @@ The table viewer is a POC to visualise excel tables in the digital editor. The e
             ]
     }
 ]
-
+```
 
