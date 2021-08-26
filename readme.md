@@ -46,8 +46,8 @@ The table viewer is a POC to visualise excel tables in the digital editor. The e
                         "tableHTML": ""
                     }
                 },
-                "viewLink": "https://woodwing.github.io/digital-editor-table-viewer/src/view.html",
-                "editLink": "https://woodwing.github.io/digital-editor-table-viewer/src/edit.html"
+                "viewLink": "https://myserver.com/integrations/digital-editor-table-viewer/src/view.html",
+                "editLink": "https://myserver.com/integrations/digital-editor-table-viewer/src/edit.html"
             },            
             "dataType": "doc-interactive"
         }
